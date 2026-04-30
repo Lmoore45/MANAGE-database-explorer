@@ -1,5 +1,5 @@
 # MANAGE Database Explorer
-# Initial R Shiny application for exploring MANAGE sample locations and metadata availability
+# R Shiny application for exploring MANAGE sample locations and metadata availability
 
 library(shiny)
 library(bslib)
