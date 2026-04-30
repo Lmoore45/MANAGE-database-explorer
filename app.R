@@ -12,7 +12,7 @@ library(scales)
 # ---- Load data ----
 
 sample_data <- read_csv(
-  "data/Sample_File_US.csv",
+  "data_public/MANAGE_sample_metadata_public.csv",
   show_col_types = FALSE,
   name_repair = "unique"
 ) %>%
@@ -34,16 +34,6 @@ sample_data <- sample_data %>%
   mutate(
     latitude = as.numeric(latitude),
     longitude = as.numeric(longitude),
-    
-    # Public-facing project categories
-    project_group = case_when(
-      map_project %in% c("Wrighton Lab", "IN-RICHES") ~ "Producer and Research",
-      map_project %in% c("Syngenta", "Nutrien") ~ "Industry Collaborations",
-      map_project == "Literature Sourced" ~ "Literature Sourced",
-      map_project == "DOE Joint Genome Institute (JGI)" ~ "DOE Joint Genome Institute (JGI)",
-      TRUE ~ as.character(map_project)
-    ),
-    
     project_group = as.character(project_group),
     state = as.character(state)
   ) %>%
