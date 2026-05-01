@@ -53,8 +53,6 @@ MANAGE-database-explorer/
 ├── README.md
 ├── data_public/
 │   └── MANAGE_sample_metadata_public.csv
-├── data-raw/
-│   └── create_public_app_data.R
 ├── www/
 ├── R/
 └── MANAGE-database-explorer.Rproj
