@@ -56,10 +56,6 @@ outputs/
 *.rds
 .DS_Store
 
-!data-raw/
-!data-raw/*
-!data-raw/create_public_app_data.R
-
 !data_public/
 !data_public/*
 !data_public/MANAGE_sample_metadata_public.csv
