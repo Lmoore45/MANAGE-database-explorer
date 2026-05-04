@@ -4,6 +4,10 @@
 
 **MANAGE** stands for **Multi-Omics for ANalyzing AGricultural Ecosystems**. This app provides a map-based interface for visualizing agricultural metagenomic samples from multiple datasets collated into a single resource across the United States.
 
+## Live App
+
+[Launch the MANAGE Database Explorer](https://lmoore45.shinyapps.io/manage-database-explorer/)
+
 ## Overview
 
 Predicting nutrient cycling, carbon transformation, and soil resilience under changing agricultural management and climate conditions requires a better understanding of soil microbiomes across landscapes. MANAGE was developed as a genome-resolved resource for agricultural soils, linking metagenomic samples with soil, management, and environmental metadata.
