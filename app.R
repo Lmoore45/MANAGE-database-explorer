@@ -9,10 +9,10 @@ library(DT)
 library(janitor)
 library(scales)
 
-# ---- Load data ----
+# ---- Load public V2 data ----
 
 sample_data <- read_csv(
-  "data_public/MANAGE_sample_metadata_public.csv",
+  "data_public/MANAGE_metadata_public_v2.csv",
   show_col_types = FALSE,
   name_repair = "unique"
 ) %>%
@@ -20,12 +20,43 @@ sample_data <- read_csv(
 
 # ---- Helper functions ----
 
-is_yes <- function(x) {
-  str_to_lower(as.character(x)) %in% c("yes", "y", "true", "1")
+is_present <- function(x) {
+  x_chr <- str_trim(as.character(x))
+  !is.na(x) &
+    x_chr != "" &
+    !str_to_lower(x_chr) %in% c("na", "nan", "null", "none", "unknown")
 }
 
 safe_sum <- function(x) {
   sum(as.numeric(x), na.rm = TRUE)
+}
+
+clean_choice_vector <- function(x) {
+  x <- sort(unique(as.character(x)))
+  x <- x[!is.na(x) & x != ""]
+  c("All", x)
+}
+
+# ---- Privacy check ----
+# These columns should never appear in the public app dataset.
+
+private_cols <- c(
+  "raw_sample_name",
+  "server_sample",
+  "project",
+  "map_project",
+  "contributing_pi"
+)
+
+private_cols_found <- intersect(private_cols, names(sample_data))
+
+if (length(private_cols_found) > 0) {
+  stop(
+    paste(
+      "Private/internal columns found in public app data:",
+      paste(private_cols_found, collapse = ", ")
+    )
+  )
 }
 
 # ---- Basic data cleaning ----
@@ -34,65 +65,65 @@ sample_data <- sample_data %>%
   mutate(
     latitude = as.numeric(latitude),
     longitude = as.numeric(longitude),
-    project_group = as.character(project_group),
-    state = as.character(state)
+    manage_sample = as.character(manage_sample),
+    public_project = as.character(public_project),
+    state = as.character(state),
+    system = as.character(system),
+    scorpan_zone = as.character(scorpan_zone)
   ) %>%
   filter(
     !is.na(latitude),
     !is.na(longitude)
   )
 
-# ---- Metadata availability columns ----
+# ---- Metadata value columns ----
+# These are real measured metadata columns in V2.
+# Data availability is calculated based on whether these columns have non-missing values.
 
-availability_lookup <- tibble::tribble(
+metadata_lookup <- tibble::tribble(
   ~column, ~label,
-  "has_metadata", "Any Metadata",
-  "has_management", "Management Data",
-  "has_tc", "Total Carbon",
-  "has_soc", "Soil Organic Carbon",
-  "has_om", "Organic Matter",
-  "has_maoc", "Mineral-Associated Organic Carbon",
-  "has_poc", "Particulate Organic Carbon",
-  "has_tn", "Total Nitrogen",
-  "has_no3", "Nitrate",
-  "has_nh4", "Ammonium",
-  "has_pmn", "Potentially Mineralizable Nitrogen",
-  "has_p", "Phosphorus",
-  "has_k", "Potassium",
-  "has_micronutrients", "Micronutrients",
-  "has_p_h", "pH",
-  "has_bd", "Bulk Density",
-  "has_texture", "Texture"
+  "total_c_mg_c_g_soil", "Total Carbon",
+  "soc_mg_c_g_soil", "Soil Organic Carbon",
+  "om_percent", "Organic Matter",
+  "maoc_mg_c_g_soil", "Mineral-Associated Organic Carbon",
+  "poc_mg_c_g_soil", "Particulate Organic Carbon",
+  "total_n_percent", "Total Nitrogen",
+  "no3_n_mg_kg", "Nitrate",
+  "nh4_n_mg_kg", "Ammonium",
+  "pmn_mg_kg", "Potentially Mineralizable Nitrogen",
+  "p_mg_kg", "Phosphorus",
+  "k_mg_kg", "Potassium",
+  "mg_mg_kg", "Magnesium",
+  "ca_mg_kg", "Calcium",
+  "mn_mg_kg", "Manganese",
+  "na_mg_kg", "Sodium",
+  "zn_mg_kg", "Zinc",
+  "fe_mg_kg", "Iron",
+  "cu_mg_kg", "Copper",
+  "s_mg_kg", "Sulfur",
+  "b_mg_kg", "Boron",
+  "p_h", "pH",
+  "bulk_density_g_cm3", "Bulk Density",
+  "texture_class", "Texture Class",
+  "sand_percent", "Sand",
+  "clay_percent", "Clay",
+  "silt_percent", "Silt"
 ) %>%
   filter(column %in% names(sample_data))
 
-availability_cols <- availability_lookup$column
+metadata_cols <- metadata_lookup$column
 
-# For Shiny checkboxGroupInput:
-# names = what the user sees
-# values = actual column names used for filtering
-availability_choices <- setNames(
-  availability_lookup$column,
-  availability_lookup$label
-)
-
-# For renaming table columns later
-availability_rename_vector <- setNames(
-  availability_lookup$column,
-  availability_lookup$label
+metadata_choices <- setNames(
+  metadata_lookup$column,
+  metadata_lookup$label
 )
 
 # ---- Filter choices ----
 
-project_choices <- c(
-  "All",
-  sort(unique(sample_data$project_group))
-)
-
-state_choices <- c(
-  "All",
-  sort(unique(sample_data$state))
-)
+project_choices <- clean_choice_vector(sample_data$public_project)
+state_choices <- clean_choice_vector(sample_data$state)
+system_choices <- clean_choice_vector(sample_data$system)
+scorpan_choices <- clean_choice_vector(sample_data$scorpan_zone)
 
 # ---- UI ----
 
@@ -105,7 +136,7 @@ ui <- page_sidebar(
   ),
   
   sidebar = sidebar(
-    width = 300,
+    width = 310,
     
     h4("Filters"),
     
@@ -125,17 +156,33 @@ ui <- page_sidebar(
       multiple = FALSE
     ),
     
+    selectInput(
+      inputId = "system_filter",
+      label = "System",
+      choices = system_choices,
+      selected = "All",
+      multiple = FALSE
+    ),
+    
+    selectInput(
+      inputId = "scorpan_filter",
+      label = "SCORPAN Zone",
+      choices = scorpan_choices,
+      selected = "All",
+      multiple = FALSE
+    ),
+    
     checkboxGroupInput(
-      inputId = "availability_filter",
-      label = "Required data availability",
-      choices = availability_choices,
+      inputId = "metadata_filter",
+      label = "Required metadata availability",
+      choices = metadata_choices,
       selected = NULL
     ),
     
     hr(),
     
     p(
-      "Use the filters to explore where MANAGE metagenomes are located and which samples have paired soil, management, and metadata measurements."
+      "Use the filters to explore where MANAGE metagenomes are located and which samples have paired soil, management, system, and SCORPAN metadata."
     )
   ),
   
@@ -147,10 +194,10 @@ ui <- page_sidebar(
         card_body(
           p(
             strong("Multi-Omics for ANalyzing AGricultural Ecosystems (MANAGE)"),
-            " is an interactive map showcasing agricultural metagenomic samples from multiple datasets collated into a single resource across the United States."
+            " is an interactive map showcasing agricultural metagenomic samples from multiple datasets collated into a single public-facing resource across the United States."
           ),
           p(
-            "This dashboard allows users to explore the spatial distribution of MANAGE samples, compare project-level data coverage, and identify samples with paired soil, management, and metadata measurements relevant to agricultural microbiome research."
+            "This dashboard allows users to explore the spatial distribution of MANAGE samples, compare project-level data coverage, and identify samples with paired soil, management, SCORPAN, and system-level metadata relevant to agricultural microbiome research."
           ),
           p(
             strong("Questions about the map?"),
@@ -161,7 +208,7 @@ ui <- page_sidebar(
             )
           ),
           p(
-            strong("Version 1.0")
+            strong("Version 2.0")
           )
         )
       ),
@@ -215,7 +262,7 @@ ui <- page_sidebar(
       card(
         card_header("Download filtered sample table"),
         p(
-          "Download the currently filtered MANAGE sample table. The file reflects the project, state, and data availability filters selected in the sidebar."
+          "Download the currently filtered public MANAGE sample table. The file reflects the project, state, system, SCORPAN zone, and metadata availability filters selected in the sidebar."
         ),
         downloadButton(
           outputId = "download_filtered_data",
@@ -230,6 +277,7 @@ ui <- page_sidebar(
     )
   )
 )
+
 # ---- Server ----
 
 server <- function(input, output, session) {
@@ -240,7 +288,7 @@ server <- function(input, output, session) {
     
     if (!is.null(input$project_filter) && input$project_filter != "All") {
       dat <- dat %>%
-        filter(project_group == input$project_filter)
+        filter(public_project == input$project_filter)
     }
     
     if (!is.null(input$state_filter) && input$state_filter != "All") {
@@ -248,10 +296,20 @@ server <- function(input, output, session) {
         filter(state == input$state_filter)
     }
     
-    if (length(input$availability_filter) > 0) {
-      for (col in input$availability_filter) {
+    if (!is.null(input$system_filter) && input$system_filter != "All") {
+      dat <- dat %>%
+        filter(system == input$system_filter)
+    }
+    
+    if (!is.null(input$scorpan_filter) && input$scorpan_filter != "All") {
+      dat <- dat %>%
+        filter(scorpan_zone == input$scorpan_filter)
+    }
+    
+    if (length(input$metadata_filter) > 0) {
+      for (col in input$metadata_filter) {
         dat <- dat %>%
-          filter(is_yes(.data[[col]]))
+          filter(is_present(.data[[col]]))
       }
     }
     
@@ -284,7 +342,7 @@ server <- function(input, output, session) {
     
     pal <- colorFactor(
       palette = "Set2",
-      domain = sample_data$project_group
+      domain = sample_data$public_project
     )
     
     leaflet(dat) %>%
@@ -309,26 +367,28 @@ server <- function(input, output, session) {
         lng = ~longitude,
         lat = ~latitude,
         radius = 5,
-        color = ~pal(project_group),
+        color = ~pal(public_project),
         stroke = FALSE,
         fillOpacity = 0.75,
         popup = ~paste0(
-          "<strong>Sample:</strong> ", sample_name, "<br>",
           "<strong>MANAGE sample:</strong> ", manage_sample, "<br>",
-          "<strong>Project:</strong> ", project_group, "<br>",
+          "<strong>Project:</strong> ", public_project, "<br>",
+          "<strong>System:</strong> ", system, "<br>",
+          "<strong>SCORPAN zone:</strong> ", scorpan_zone, "<br>",
           "<strong>State:</strong> ", state, "<br>",
           "<strong>Metagenome size:</strong> ", meta_g_size_gbp, " Gbp<br>",
           "<strong>dRep 99% MAGs:</strong> ", number_of_d_rep_99_bins, "<br>",
-          "<strong>Soil Organic Carbon:</strong> ", has_soc, "<br>",
-          "<strong>Total Nitrogen:</strong> ", has_tn, "<br>",
-          "<strong>pH:</strong> ", has_p_h, "<br>",
-          "<strong>Texture:</strong> ", has_texture
+          "<strong>SOC:</strong> ", soc_mg_c_g_soil, " mg C/g soil<br>",
+          "<strong>Organic matter:</strong> ", om_percent, " %<br>",
+          "<strong>Total N:</strong> ", total_n_percent, " %<br>",
+          "<strong>pH:</strong> ", p_h, "<br>",
+          "<strong>Texture:</strong> ", texture_class
         )
       ) %>%
       addLegend(
         position = "bottomright",
         pal = pal,
-        values = ~project_group,
+        values = ~public_project,
         title = "Project"
       )
   })
@@ -336,8 +396,8 @@ server <- function(input, output, session) {
   output$project_plot <- renderPlot({
     
     filtered_data() %>%
-      count(project_group, sort = TRUE) %>%
-      ggplot(aes(x = reorder(project_group, n), y = n)) +
+      count(public_project, sort = TRUE) %>%
+      ggplot(aes(x = reorder(public_project, n), y = n)) +
       geom_col() +
       coord_flip() +
       labs(
@@ -356,17 +416,18 @@ server <- function(input, output, session) {
     )
     
     dat %>%
-      select(any_of(availability_cols)) %>%
+      select(any_of(metadata_cols)) %>%
+      mutate(across(everything(), as.character)) %>%
       pivot_longer(
         cols = everything(),
         names_to = "metadata_type",
-        values_to = "available"
+        values_to = "value"
       ) %>%
       mutate(
-        available = is_yes(available)
+        available = is_present(value)
       ) %>%
       left_join(
-        availability_lookup,
+        metadata_lookup,
         by = c("metadata_type" = "column")
       ) %>%
       filter(available) %>%
@@ -389,23 +450,25 @@ server <- function(input, output, session) {
       need(nrow(dat) > 0, "No samples match the selected filters.")
     )
     
-    dat %>%
+    table_data <- dat %>%
       select(
-        sample_name,
         manage_sample,
-        project_group,
+        public_project,
+        system,
+        scorpan_zone,
         state,
         latitude,
         longitude,
         meta_g_number_of_reads,
         meta_g_size_gbp,
         number_of_d_rep_99_bins,
-        any_of(availability_cols)
+        any_of(metadata_cols)
       ) %>%
       rename(
-        Sample = sample_name,
         `MANAGE Sample` = manage_sample,
-        Project = project_group,
+        Project = public_project,
+        System = system,
+        `SCORPAN Zone` = scorpan_zone,
         State = state,
         Latitude = latitude,
         Longitude = longitude,
@@ -414,41 +477,45 @@ server <- function(input, output, session) {
         `dRep 99% MAGs` = number_of_d_rep_99_bins
       ) %>%
       rename_with(
-        .fn = ~ availability_lookup$label[match(.x, availability_lookup$column)],
-        .cols = any_of(availability_lookup$column)
-      ) %>%
-      datatable(
-        options = list(
-          pageLength = 10,
-          scrollX = TRUE
-        ),
-        rownames = FALSE
+        .fn = ~ metadata_lookup$label[match(.x, metadata_lookup$column)],
+        .cols = any_of(metadata_lookup$column)
       )
+    
+    datatable(
+      table_data,
+      options = list(
+        pageLength = 10,
+        scrollX = TRUE
+      ),
+      rownames = FALSE
+    )
   })
   
   output$download_filtered_data <- downloadHandler(
     filename = function() {
-      paste0("MANAGE_filtered_samples_", Sys.Date(), ".csv")
+      paste0("MANAGE_filtered_samples_v2_", Sys.Date(), ".csv")
     },
     content = function(file) {
       
       filtered_data() %>%
         select(
-          sample_name,
           manage_sample,
-          project_group,
+          public_project,
+          system,
+          scorpan_zone,
           state,
           latitude,
           longitude,
           meta_g_number_of_reads,
           meta_g_size_gbp,
           number_of_d_rep_99_bins,
-          any_of(availability_cols)
+          any_of(metadata_cols)
         ) %>%
         rename(
-          Sample = sample_name,
           `MANAGE Sample` = manage_sample,
-          Project = project_group,
+          Project = public_project,
+          System = system,
+          `SCORPAN Zone` = scorpan_zone,
           State = state,
           Latitude = latitude,
           Longitude = longitude,
@@ -457,8 +524,8 @@ server <- function(input, output, session) {
           `dRep 99% MAGs` = number_of_d_rep_99_bins
         ) %>%
         rename_with(
-          .fn = ~ availability_lookup$label[match(.x, availability_lookup$column)],
-          .cols = any_of(availability_lookup$column)
+          .fn = ~ metadata_lookup$label[match(.x, metadata_lookup$column)],
+          .cols = any_of(metadata_lookup$column)
         ) %>%
         write_csv(file)
     }

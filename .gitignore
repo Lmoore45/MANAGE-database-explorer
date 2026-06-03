@@ -59,3 +59,4 @@ outputs/
 !data_public/
 !data_public/*
 !data_public/MANAGE_sample_metadata_public.csv
+.positai
